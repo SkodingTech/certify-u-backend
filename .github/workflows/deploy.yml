@@ -98,8 +98,11 @@ jobs:
             pip install -r requirements.txt
 
             # 4. Django housekeeping
+            #    --fake-initial lets us share a DB with the legacy /home/ubuntu/certifyu
+            #    app: migrations whose tables already exist are marked applied without
+            #    re-running the CREATE TABLE.  New migrations (e.g. 0012) still apply.
             echo "==> Running migrations"
-            python manage.py migrate --noinput
+            python manage.py migrate --fake-initial --noinput
 
             echo "==> Collecting static"
             python manage.py collectstatic --noinput || true
