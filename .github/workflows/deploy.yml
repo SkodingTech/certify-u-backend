@@ -1,0 +1,117 @@
+name: Deploy backend to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+  DJANGO_DEBUG: ${{ vars.DJANGO_DEBUG || 'False' }}
+  DJANGO_ALLOWED_HOSTS: ${{ vars.DJANGO_ALLOWED_HOSTS }}
+  DB_NAME: ${{ vars.DB_NAME || 'certifyu' }}
+  DB_USER: ${{ vars.DB_USER || 'certifyuuser' }}
+  DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+  DB_HOST: ${{ vars.DB_HOST || 'localhost' }}
+  DB_PORT: ${{ vars.DB_PORT || '' }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_STORAGE_BUCKET_NAME: ${{ vars.AWS_STORAGE_BUCKET_NAME || 'certifyu' }}
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout (sanity)
+        uses: actions/checkout@v4
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          command_timeout: 10m
+          envs: DJANGO_SECRET_KEY,DJANGO_DEBUG,DJANGO_ALLOWED_HOSTS,DB_NAME,DB_USER,DB_PASSWORD,DB_HOST,DB_PORT,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_STORAGE_BUCKET_NAME
+          script: |
+            set -euo pipefail
+
+            APP_DIR="${APP_DIR:-/home/ubuntu/certify-u-backend}"
+            BRANCH="${BRANCH:-main}"
+            VENV_DIR="${VENV_DIR:-$APP_DIR/env}"
+            SERVICE_NAME="${SERVICE_NAME:-gunicorn}"
+
+            echo "==> Deploy target: $APP_DIR  (branch: $BRANCH)"
+
+            # 1. First-time clone or pull
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "==> Cloning fresh"
+              git clone --branch "$BRANCH" "https://github.com/${{ github.repository }}.git" "$APP_DIR"
+            else
+              echo "==> Fetching updates"
+              cd "$APP_DIR"
+              git fetch origin "$BRANCH"
+              git reset --hard "origin/$BRANCH"
+            fi
+
+            cd "$APP_DIR"
+
+            # 2a. Write a .env file from the secrets the workflow forwarded.
+            # The Django settings.py reads this on startup.
+            cat > "$APP_DIR/.env" <<ENVEOF
+            DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+            DJANGO_DEBUG=${DJANGO_DEBUG}
+            DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS}
+            DB_NAME=${DB_NAME}
+            DB_USER=${DB_USER}
+            DB_PASSWORD=${DB_PASSWORD}
+            DB_HOST=${DB_HOST}
+            DB_PORT=${DB_PORT}
+            AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+            AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+            AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME}
+            ENVEOF
+            chmod 600 "$APP_DIR/.env"
+
+            # 2. Virtualenv (create if missing)
+            if [ ! -d "$VENV_DIR" ]; then
+              echo "==> Creating virtualenv"
+              python3 -m venv "$VENV_DIR"
+            fi
+            # shellcheck disable=SC1091
+            source "$VENV_DIR/bin/activate"
+
+            # 3. Install / upgrade deps
+            echo "==> Installing requirements"
+            pip install --upgrade pip wheel
+            pip install -r requirements.txt
+
+            # 4. Django housekeeping
+            echo "==> Running migrations"
+            python manage.py migrate --noinput
+
+            echo "==> Collecting static"
+            python manage.py collectstatic --noinput || true
+
+            # 5. Restart service (best-effort across common setups)
+            echo "==> Restarting service"
+            if sudo -n systemctl restart "$SERVICE_NAME" 2>/dev/null; then
+              echo "    systemd $SERVICE_NAME restarted"
+            elif command -v supervisorctl >/dev/null && sudo -n supervisorctl restart "$SERVICE_NAME" 2>/dev/null; then
+              echo "    supervisor $SERVICE_NAME restarted"
+            elif [ -f "$APP_DIR/restart.sh" ]; then
+              bash "$APP_DIR/restart.sh"
+            else
+              echo "    !! No service restart hook configured."
+              echo "    !! Set SERVICE_NAME or place a restart.sh in the repo root."
+            fi
+
+            echo "==> Deploy complete"

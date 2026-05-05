@@ -1,0 +1,62 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+*.so
+
+# Virtualenv
+env/
+venv/
+.venv/
+ENV/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Static / media
+/static/
+/staticfiles/
+/media/
+/web/static/
+
+# Test artefacts
+.coverage
+.tox/
+.pytest_cache/
+htmlcov/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build output
+build/
+dist/
+
+# Zappa
+zappa_settings.json
+
+# OS / runtime
+*.pid
+*.lock
+
+# Project-specific scratch scripts (kept locally only)
+check_assessment.py
+check_db.py
+create_live_data.py
+fix_assessment_data.py
+re-migrate.py
+test_proposal_features.py
