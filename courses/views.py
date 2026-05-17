@@ -44,14 +44,85 @@ class CategoryListView(generics.ListAPIView):
         return data
     
 class CourseListView(generics.ListAPIView):
+    """Marketplace-grade course list with sort + filter params.
+
+    Query parameters:
+      type        : 'training' | 'accreditation'
+      category    : Category slug (repeatable, ?category=a&category=b)
+      provider    : Organization id (repeatable)
+      instructor  : Instructor id (repeatable)
+      level       : beginner|intermediate|advanced|mixed
+      mode        : online|offline|hybrid
+      price_min / price_max : numeric range
+      q           : free-text search on title/subtitle/description
+      sort        : popular | rating | price_low | price_high | latest | fastest
+      featured    : 'true' to surface featured only
+    """
     serializer_class = CourseSerializer
     pagination_class = CompanyPagination
-    def get_queryset(self,*args, **kwargs):
-        queryset = Course.objects.filter(is_deleted=False, is_approved=True, status='published').order_by('-id')
-        course_type = self.request.query_params.get('type')
+
+    SORT_MAP = {
+        'popular':    '-enrolled_students',
+        'rating':     '-rating',
+        'price_low':  'price',
+        'price_high': '-price',
+        'latest':     '-id',
+        'fastest':    'duration_weeks',
+    }
+
+    def get_queryset(self, *args, **kwargs):
+        qs = Course.objects.filter(
+            is_deleted=False, is_approved=True, status='published',
+        )
+        params = self.request.query_params
+
+        course_type = params.get('type')
         if course_type:
-            queryset = queryset.filter(course_type=course_type)
-        return queryset
+            qs = qs.filter(course_type=course_type)
+
+        categories = params.getlist('category')
+        if categories:
+            qs = qs.filter(categories__slug__in=categories).distinct()
+
+        providers = params.getlist('provider')
+        if providers:
+            qs = qs.filter(organization_id__in=providers)
+
+        instructors = params.getlist('instructor')
+        if instructors:
+            qs = qs.filter(instructors__id__in=instructors).distinct()
+
+        level = params.get('level')
+        if level:
+            qs = qs.filter(level=level)
+
+        mode = params.get('mode')
+        if mode:
+            qs = qs.filter(delivery_mode=mode)
+
+        price_min = params.get('price_min')
+        if price_min:
+            try: qs = qs.filter(price__gte=float(price_min))
+            except ValueError: pass
+
+        price_max = params.get('price_max')
+        if price_max:
+            try: qs = qs.filter(price__lte=float(price_max))
+            except ValueError: pass
+
+        q = params.get('q')
+        if q:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(title__icontains=q) | Q(subtitle__icontains=q) | Q(description__icontains=q)
+            )
+
+        if params.get('featured', '').lower() == 'true':
+            qs = qs.filter(featured=True)
+
+        sort = params.get('sort', 'latest')
+        order = self.SORT_MAP.get(sort, '-id')
+        return qs.order_by(order, '-id')
     
 class ModuleListView(generics.ListAPIView):
     serializer_class = ModuleSerializer
