@@ -120,16 +120,24 @@ WSGI_APPLICATION = 'certifyu.wsgi.application'
 #     }
 # }
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME':     os.environ.get('DB_NAME', 'certifyu'),
-        'USER':     os.environ.get('DB_USER', 'certifyuuser'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-        'HOST':     os.environ.get('DB_HOST', 'localhost'),
-        'PORT':     os.environ.get('DB_PORT', ''),
+if os.environ.get('DB_ENGINE', '').lower() == 'sqlite':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'NAME':     os.environ.get('DB_NAME', 'certifyu'),
+            'USER':     os.environ.get('DB_USER', 'certifyuuser'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+            'HOST':     os.environ.get('DB_HOST', 'localhost'),
+            'PORT':     os.environ.get('DB_PORT', ''),
+        }
+    }
 
 # Postgres bootstrap (run on a fresh DB host):
 #   CREATE DATABASE certifyu;
@@ -189,10 +197,18 @@ AWS_LOCATION = 'static'
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'web/static/'),
 ]
-STATIC_URL = 'https://%s/%s/' % (AWS_S3_CUSTOM_DOMAIN, AWS_LOCATION)
-STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-AWS_DEFAULT_ACL = 'public-read'
+if os.environ.get('USE_LOCAL_STORAGE', '').lower() in ('1', 'true', 'yes'):
+    STATIC_URL = '/static/'
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+else:
+    STATIC_URL = 'https://%s/%s/' % (AWS_S3_CUSTOM_DOMAIN, AWS_LOCATION)
+    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    AWS_DEFAULT_ACL = 'public-read'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
