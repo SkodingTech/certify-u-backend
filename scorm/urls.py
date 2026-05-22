@@ -6,6 +6,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from scorm import views
+from scorm import views_admin as adm
 
 # Create router for viewsets
 router = DefaultRouter()
@@ -30,4 +31,11 @@ urlpatterns = [
 
     # Attempts
     path('attempts/', views.ScormAttemptListView.as_view(), name='scorm-attempt-list'),
+
+    # ── Admin CMS lists ─────────────────────────────────────────────────────
+    path('admin/modules/', adm.ScormModuleAdminList.as_view(), name='scorm-admin-modules'),
+    path('admin/scos/', adm.ScormScoAdminList.as_view(), name='scorm-admin-scos'),
+    path('admin/runtime-data/', adm.ScormRuntimeDataAdminList.as_view(), name='scorm-admin-runtime'),
+    path('admin/tracking/', adm.ScormTrackingAdminList.as_view(), name='scorm-admin-tracking'),
+    path('admin/attempts/', adm.ScormAttemptAdminList.as_view(), name='scorm-admin-attempts'),
 ]

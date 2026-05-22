@@ -1,6 +1,7 @@
 from django.urls import path
 from courses import views
 from courses import views_extra as vx
+from courses import views_admin as adm
 
 
 urlpatterns = [
@@ -99,4 +100,47 @@ urlpatterns = [
     path('support/tickets/', vx.SupportTicketListCreateView.as_view()),
     path('support/tickets/<int:pk>/', vx.SupportTicketUpdateView.as_view()),
     path('support/whatsapp/webhook/', vx.WhatsAppWebhookView.as_view()),
+
+    ### ── Admin / CMS endpoints (new) ───────────────────────────────────────
+    path('admin/organizations/', adm.OrganizationListCreate.as_view()),
+    path('admin/organizations/<int:pk>/', adm.OrganizationDetail.as_view()),
+
+    path('admin/instructors/', adm.InstructorAdminList.as_view()),
+    path('admin/instructors/<int:pk>/', adm.InstructorAdminDetail.as_view()),
+
+    path('admin/trainer-availability/', adm.TrainerAvailabilityAdminList.as_view()),
+    path('admin/trainer-availability/<int:pk>/', adm.TrainerAvailabilityAdminDetail.as_view()),
+
+    path('admin/reviews/', adm.ReviewAdminList.as_view()),
+    path('admin/reviews/<int:pk>/', adm.ReviewAdminDetail.as_view()),
+
+    path('admin/assessment-attempts/', adm.AssessmentAttemptAdminList.as_view()),
+    path('admin/assessment-attempts/<int:pk>/', adm.AssessmentAttemptAdminDetail.as_view()),
+
+    path('admin/lesson-progress/', adm.LessonProgressAdminList.as_view()),
+    path('admin/module-progress/', adm.ModuleProgressAdminList.as_view()),
+    path('admin/presentation-progress/', adm.PresentationProgressAdminList.as_view()),
+
+    path('admin/live-session-requests/', adm.LiveSessionRequestAdminList.as_view()),
+
+    path('admin/discussions/', adm.DiscussionAdminList.as_view()),
+    path('admin/discussion-replies/', adm.DiscussionReplyAdminList.as_view()),
+
+    path('admin/regulatory-authorities/', adm.RegulatoryAuthorityListCreate.as_view()),
+    path('admin/regulatory-authorities/<int:pk>/', adm.RegulatoryAuthorityDetail.as_view()),
+
+    path('admin/regulatory-compliance/', adm.RegulatoryComplianceListCreate.as_view()),
+    path('admin/regulatory-compliance/<int:pk>/', adm.RegulatoryComplianceDetail.as_view()),
+
+    path('admin/regulatory-references/', adm.RegulatoryReferenceListCreate.as_view()),
+    path('admin/regulatory-references/<int:pk>/', adm.RegulatoryReferenceDetail.as_view()),
+
+    path('admin/compliance-documents/', adm.ComplianceDocumentListCreate.as_view()),
+    path('admin/compliance-documents/<int:pk>/', adm.ComplianceDocumentDetail.as_view()),
+
+    path('admin/student-documents/', adm.StudentDocumentAdminList.as_view()),
+    path('admin/student-documents/<int:pk>/', adm.StudentDocumentAdminDetail.as_view()),
+
+    path('admin/support-channels/', adm.SupportChannelListCreate.as_view()),
+    path('admin/support-channels/<int:pk>/', adm.SupportChannelDetail.as_view()),
 ]

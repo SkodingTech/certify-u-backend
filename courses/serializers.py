@@ -366,3 +366,93 @@ class InstructorPublicProfileSerializer(serializers.ModelSerializer):
 
     def get_review_count(self, obj):
         return Review.objects.filter(course__instructors=obj).count()
+
+
+### Extra admin-side serializers ###
+from courses.models import (
+    RegulatoryAuthority, RegulatoryCompliance, RegulatoryReference,
+    ComplianceDocument,
+)
+from courses.models.enrollment import LessonProgress
+
+
+class LessonProgressSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    lesson_title = serializers.CharField(source='lesson.title', read_only=True)
+    course_title = serializers.CharField(source='lesson.module.course.title', read_only=True)
+
+    class Meta:
+        model = LessonProgress
+        exclude = excludeData
+
+    def get_student_name(self, obj):
+        u = obj.enrollment.student
+        return f"{u.first_name} {u.last_name}".strip() or u.username
+
+
+class RegulatoryAuthoritySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RegulatoryAuthority
+        exclude = excludeData
+
+
+class RegulatoryComplianceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RegulatoryCompliance
+        exclude = excludeData
+
+
+class RegulatoryReferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RegulatoryReference
+        exclude = excludeData
+
+
+class ComplianceDocumentSerializer(serializers.ModelSerializer):
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    document_type_display = serializers.CharField(source='get_document_type_display', read_only=True)
+
+    class Meta:
+        model = ComplianceDocument
+        exclude = excludeData
+
+
+class ReviewAdminSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    course_title = serializers.CharField(source='course.title', read_only=True)
+
+    class Meta:
+        model = Review
+        fields = ['id', 'student_name', 'course_title', 'rating', 'title', 'comment',
+                  'helpful_count', 'created_at']
+
+    def get_student_name(self, obj):
+        u = obj.student
+        return f"{u.first_name} {u.last_name}".strip() or u.username
+
+
+class AssessmentAttemptAdminSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    assessment_title = serializers.CharField(source='assessment.title', read_only=True)
+    course_title = serializers.CharField(source='assessment.course.title', read_only=True)
+
+    class Meta:
+        model = AssessmentAttempt
+        exclude = excludeData
+
+    def get_student_name(self, obj):
+        u = obj.student
+        return f"{u.first_name} {u.last_name}".strip() or u.username
+
+
+class LiveSessionRequestAdminSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    course_title = serializers.CharField(source='course.title', read_only=True)
+
+    class Meta:
+        model = LiveSessionRequest
+        exclude = excludeData
+
+    def get_student_name(self, obj):
+        u = obj.student
+        return f"{u.first_name} {u.last_name}".strip() or u.username

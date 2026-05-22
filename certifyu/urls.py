@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/',include('api.urls')),
     path('users/',include('users.urls')),
     path('courses/',include('courses.urls')),
+    path('scorm/',include('scorm.urls')),
     
     re_path(r'^ckeditor/', include('ckeditor_uploader.urls')),
 ]

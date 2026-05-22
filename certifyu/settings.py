@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'api',
     'users',
     'courses',
+    'scorm',
     
     'rest_framework',
     'storages',
