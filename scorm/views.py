@@ -40,13 +40,15 @@ class IsAuthenticated(permissions.IsAuthenticated):
 
 
 class IsAdminUser(permissions.BasePermission):
-    """Check if user is admin"""
+    """Check if user is admin. Guards against AnonymousUser (no userprofile)."""
     def has_permission(self, request, view):
-        return request.user and (
-            request.user.is_staff or
-            request.user.is_superuser or
-            request.user.userprofile.role in ['ADMIN', 'SUPER_ADMIN']
-        )
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if user.is_staff or user.is_superuser:
+            return True
+        prof = getattr(user, 'user_profile', None) or getattr(user, 'userprofile', None)
+        return bool(prof and getattr(prof, 'role', None) in ('ADMIN', 'SUPER_ADMIN'))
 
 
 class ScormPackageViewSet(viewsets.ModelViewSet):
