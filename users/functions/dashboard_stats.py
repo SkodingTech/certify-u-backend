@@ -1,54 +1,82 @@
-from courses.models.enrollment import Enrollment
-from courses.models.course import Course
-from rest_framework.response import Response
+from django.contrib.auth import get_user_model
+from django.db.models import Avg
 from rest_framework import status
-from django.db.models import Sum
+from rest_framework.response import Response
+
+from courses.models.course import Course
+from courses.models.enrollment import Enrollment
+from courses.models.instructor import Instructor
+from courses.models.review import Review
+
+
+def _is_admin(user):
+    """Treat Django staff/superuser or profile role ADMIN/SUPER_ADMIN as platform admin."""
+    if not (user and user.is_authenticated):
+        return False
+    if user.is_staff or user.is_superuser:
+        return True
+    prof = getattr(user, 'user_profile', None) or getattr(user, 'userprofile', None)
+    return bool(prof and getattr(prof, 'role', None) in ('ADMIN', 'SUPER_ADMIN'))
+
 
 def GetDashboardStats(request):
     user = request.user
-    
-    # 1. Active Courses (Student Enrolled + Active)
-    active_courses = Enrollment.objects.filter(student=user, status='active').count()
-    
-    # 2. Enrolled Courses (All)
-    total_enrolled = Enrollment.objects.filter(student=user).count()
-    
-    # 3. Completed Courses
-    completed_courses = Enrollment.objects.filter(student=user, status='completed').count()
-    
-    # 4. Total Students (Instructor view)
-    # Count distinct students enrolled in courses taught by this user (Instructor)
-    # Assuming user.instructorprofile exists or user is linked to courses directly via 'instructors' M2M
-    # Course model has: instructors = models.ManyToManyField(Instructor, related_name='courses')
-    # Instructor model has OneToOne with User
-    total_students = 0
-    total_courses_created = 0
-    total_earnings = 0
-    review_count = 0
-    
-    instructor = None
-    if hasattr(user, 'instructor'):
-        instructor = user.instructor
-    else:
-        from courses.models.instructor import Instructor
-        instructor = Instructor.objects.filter(user=user).first()
 
+    # ── Admin view: platform-wide totals ─────────────────────────────────────
+    if _is_admin(user):
+        User = get_user_model()
+        total_courses = Course.objects.filter(is_deleted=False).count()
+        total_active = Enrollment.objects.filter(status='active').count()
+        total_completed = Enrollment.objects.filter(status='completed').count()
+        total_enrolled = Enrollment.objects.count()
+        total_students = User.objects.filter(enrollments__isnull=False).distinct().count()
+        total_instructors = Instructor.objects.filter(is_deleted=False).count()
+        review_count = Review.objects.filter(is_deleted=False).count()
+        avg_rating = Review.objects.filter(is_deleted=False).aggregate(a=Avg('rating'))['a'] or 0
+
+        return Response({
+            "view": "admin",
+            "active_courses": total_courses,           # surface as "Active Courses" tile
+            "total_courses": total_courses,
+            "total_students": total_students,
+            "total_instructors": total_instructors,
+            "total_enrollments": total_enrolled,
+            "active_enrollments": total_active,
+            "completed_enrollments": total_completed,
+            "review_count": review_count,
+            "average_rating": round(avg_rating, 2),
+            "total_earnings": 0,                       # placeholder until payments wired
+        }, status=status.HTTP_200_OK)
+
+    # ── Instructor view ──────────────────────────────────────────────────────
+    instructor = getattr(user, 'instructor', None) or Instructor.objects.filter(user=user).first()
     if instructor:
-        instructor_courses = Course.objects.filter(instructors=instructor)
-        total_courses_created = instructor_courses.count()
-        total_students = Enrollment.objects.filter(course__in=instructor_courses).values('student').distinct().count()
-        from courses.models.review import Review
-        review_count = Review.objects.filter(course__in=instructor_courses).count()
-        # total_earnings = ... would be calculated here if payments were linked
-        
-    data = {
-        "active_courses": active_courses,
-        "enrolled_courses": total_enrolled,
-        "completed_courses": completed_courses,
-        "total_students": total_students,
-        "total_courses": total_courses_created,
-        "total_earnings": total_earnings,
-        "review_count": review_count
-    }
-    
-    return Response(data, status=status.HTTP_200_OK)
+        instr_courses = Course.objects.filter(instructors=instructor, is_deleted=False)
+        total_courses_created = instr_courses.count()
+        total_students = Enrollment.objects.filter(course__in=instr_courses).values('student').distinct().count()
+        review_count = Review.objects.filter(course__in=instr_courses).count()
+        avg_rating = Review.objects.filter(course__in=instr_courses).aggregate(a=Avg('rating'))['a'] or 0
+        return Response({
+            "view": "instructor",
+            "active_courses": Enrollment.objects.filter(student=user, status='active').count(),
+            "enrolled_courses": Enrollment.objects.filter(student=user).count(),
+            "completed_courses": Enrollment.objects.filter(student=user, status='completed').count(),
+            "total_students": total_students,
+            "total_courses": total_courses_created,
+            "total_earnings": 0,
+            "review_count": review_count,
+            "average_rating": round(avg_rating, 2),
+        }, status=status.HTTP_200_OK)
+
+    # ── Student view ─────────────────────────────────────────────────────────
+    return Response({
+        "view": "student",
+        "active_courses": Enrollment.objects.filter(student=user, status='active').count(),
+        "enrolled_courses": Enrollment.objects.filter(student=user).count(),
+        "completed_courses": Enrollment.objects.filter(student=user, status='completed').count(),
+        "total_students": 0,
+        "total_courses": 0,
+        "total_earnings": 0,
+        "review_count": 0,
+        "average_rating": 0,
+    }, status=status.HTTP_200_OK)
