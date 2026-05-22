@@ -59,6 +59,16 @@ def _get_instructor(user):
     return Instructor.objects.filter(user=user).first()
 
 
+def _is_admin(user):
+    """Caller is platform admin: Django staff/superuser or profile role ADMIN/SUPER_ADMIN."""
+    if not (user and user.is_authenticated):
+        return False
+    if user.is_staff or user.is_superuser:
+        return True
+    prof = getattr(user, 'user_profile', None) or getattr(user, 'userprofile', None)
+    return bool(prof and getattr(prof, 'role', None) in ('ADMIN', 'SUPER_ADMIN'))
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Trainer Availability
 # ──────────────────────────────────────────────────────────────────────────────
@@ -73,12 +83,11 @@ class TrainerAvailabilityListCreateView(generics.ListCreateAPIView):
         qs = TrainerAvailability.objects.all()
         if instructor_id:
             qs = qs.filter(instructor_id=instructor_id)
+        elif _is_admin(self.request.user):
+            pass  # admin sees all
         else:
             inst = _get_instructor(self.request.user)
-            if inst:
-                qs = qs.filter(instructor=inst)
-            else:
-                qs = qs.none()
+            qs = qs.filter(instructor=inst) if inst else qs.none()
         return qs
 
     def perform_create(self, serializer):
@@ -146,13 +155,12 @@ class BookingListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         qs = Booking.objects.all()
-        # Instructors see bookings against their slots; students see their own
+        if _is_admin(user):
+            return qs  # admin sees every booking
         inst = _get_instructor(user)
         if inst and self.request.query_params.get('as') == 'instructor':
-            qs = qs.filter(slot__instructor=inst)
-        else:
-            qs = qs.filter(student=user)
-        return qs
+            return qs.filter(slot__instructor=inst)
+        return qs.filter(student=user)
 
     def create(self, request, *args, **kwargs):
         slot_id = request.data.get('slot')

@@ -487,10 +487,11 @@ class LiveSessionRequestListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if _caller_is_admin(user):
+            return LiveSessionRequest.objects.all().order_by('-created_at')
         if hasattr(user, 'instructor'):
-             return LiveSessionRequest.objects.filter(instructor=user.instructor).order_by('-created_at')
-        else:
-             return LiveSessionRequest.objects.filter(student=user).order_by('-created_at')
+            return LiveSessionRequest.objects.filter(instructor=user.instructor).order_by('-created_at')
+        return LiveSessionRequest.objects.filter(student=user).order_by('-created_at')
 
     def perform_create(self, serializer):
         serializer.save(student=self.request.user)
