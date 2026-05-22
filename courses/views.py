@@ -161,21 +161,31 @@ class EnrolledCourseListView(generics.ListAPIView):
         data = Course.objects.filter(id__in=enrollments, is_deleted=False).order_by('-id')
         return data
 
+def _caller_is_admin(user):
+    """Treat Django staff/superuser or profile role ADMIN/SUPER_ADMIN as platform admin."""
+    if not (user and user.is_authenticated):
+        return False
+    if user.is_staff or user.is_superuser:
+        return True
+    prof = getattr(user, 'user_profile', None) or getattr(user, 'userprofile', None)
+    return bool(prof and getattr(prof, 'role', None) in ('ADMIN', 'SUPER_ADMIN'))
+
+
 class InstructorCourseListView(generics.ListAPIView):
+    """Instructor's own courses, or all courses when the caller is an admin (CMS view)."""
     authentication_classes = (OAuth2Authentication,)
     permission_classes = (IsAuthenticated,)
     serializer_class = CourseSerializer
     pagination_class = CompanyPagination
-    def get_queryset(self,*args, **kwargs):
-        # Return courses created by this instructor
-        # Assuming user is linked via Instructor profile or directly
-        if hasattr(self.request.user, 'instructor'):
-             data = Course.objects.filter(instructors=self.request.user.instructor, is_deleted=False).order_by('-id')
-             return data
-        # Fallback for old model structure if needed
-        if hasattr(self.request.user, 'instructorprofile'):
-             data = Course.objects.filter(instructors__user=self.request.user, is_deleted=False).order_by('-id')
-             return data
+
+    def get_queryset(self, *args, **kwargs):
+        user = self.request.user
+        if _caller_is_admin(user):
+            return Course.objects.filter(is_deleted=False).order_by('-id')
+        if hasattr(user, 'instructor'):
+            return Course.objects.filter(instructors=user.instructor, is_deleted=False).order_by('-id')
+        if hasattr(user, 'instructorprofile'):
+            return Course.objects.filter(instructors__user=user, is_deleted=False).order_by('-id')
         return Course.objects.none()
 
 class InstructorListView(generics.ListAPIView):
@@ -380,17 +390,17 @@ class InstructorEnrollmentListView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        instructor = getattr(user, 'instructor', None)
-        if not instructor:
-            instructor = Instructor.objects.filter(user=user).first()
-            
-        if instructor:
+        if _caller_is_admin(user):
+            queryset = Enrollment.objects.all().order_by('-created_at')
+        else:
+            instructor = getattr(user, 'instructor', None) or Instructor.objects.filter(user=user).first()
+            if not instructor:
+                return Enrollment.objects.none()
             queryset = Enrollment.objects.filter(course__instructors=instructor).order_by('-created_at')
-            course_id = self.request.query_params.get('course')
-            if course_id:
-                queryset = queryset.filter(course_id=course_id)
-            return queryset
-        return Enrollment.objects.none()
+        course_id = self.request.query_params.get('course')
+        if course_id:
+            queryset = queryset.filter(course_id=course_id)
+        return queryset
 
 class InstructorDiscussionListView(generics.ListAPIView):
     authentication_classes = (OAuth2Authentication,)
@@ -400,14 +410,17 @@ class InstructorDiscussionListView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        instructor = getattr(user, 'instructor', getattr(user, 'instructorprofile', None))
-        if instructor:
+        if _caller_is_admin(user):
+            queryset = Discussion.objects.all().order_by('-created_at')
+        else:
+            instructor = getattr(user, 'instructor', getattr(user, 'instructorprofile', None))
+            if not instructor:
+                return Discussion.objects.none()
             queryset = Discussion.objects.filter(course__instructors=instructor).order_by('-created_at')
-            course_id = self.request.query_params.get('course')
-            if course_id:
-                queryset = queryset.filter(course_id=course_id)
-            return queryset
-        return Discussion.objects.none()
+        course_id = self.request.query_params.get('course')
+        if course_id:
+            queryset = queryset.filter(course_id=course_id)
+        return queryset
 
 
 ########################
