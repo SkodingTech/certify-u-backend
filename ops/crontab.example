@@ -1,0 +1,14 @@
+# Install with:  sudo crontab -u ubuntu -e   then paste the lines below.
+# (Or run `crontab /home/ubuntu/certifyu-new/ops/crontab.example` to overwrite.)
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Nightly Postgres backup → S3 (02:30 UTC = 06:30 Dubai)
+30 2 * * *  /home/ubuntu/certifyu-new/ops/backup_to_s3.sh >> /var/log/certifyu/backup.log 2>&1
+
+# Weekly DB vacuum analyze (Sunday 03:30 UTC)
+30 3 * * 0  /home/ubuntu/certifyu-new/env/bin/python /home/ubuntu/certifyu-new/manage.py shell -c "from django.db import connection; cur=connection.cursor(); cur.execute('VACUUM ANALYZE')" >> /var/log/certifyu/vacuum.log 2>&1
+
+# Daily log rotation guard (just in case Django's RotatingFileHandler misses)
+15 0 * * *  find /var/log/certifyu/ -name '*.log.*' -mtime +14 -delete

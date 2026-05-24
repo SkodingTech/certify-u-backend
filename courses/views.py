@@ -71,9 +71,10 @@ class CourseListView(generics.ListAPIView):
     }
 
     def get_queryset(self, *args, **kwargs):
-        qs = Course.objects.filter(
-            is_deleted=False, is_approved=True, status='published',
-        )
+        qs = (Course.objects
+              .filter(is_deleted=False, is_approved=True, status='published')
+              .select_related('organization', 'regulatory_authority')
+              .prefetch_related('instructors', 'instructors__user', 'categories'))
         params = self.request.query_params
 
         course_type = params.get('type')
@@ -154,12 +155,12 @@ class EnrolledCourseListView(generics.ListAPIView):
     serializer_class = CourseSerializer
     pagination_class = CompanyPagination
     def get_queryset(self,*args, **kwargs):
-        # Return courses where the user is enrolled
-        # Enrollment model has 'student' (User) and 'course' (Course)
-        # We want the Course objects.
         enrollments = Enrollment.objects.filter(student=self.request.user).values_list('course', flat=True)
-        data = Course.objects.filter(id__in=enrollments, is_deleted=False).order_by('-id')
-        return data
+        return (Course.objects
+                .filter(id__in=enrollments, is_deleted=False)
+                .select_related('organization')
+                .prefetch_related('instructors', 'instructors__user', 'categories')
+                .order_by('-id'))
 
 def _caller_is_admin(user):
     """Treat Django staff/superuser or profile role ADMIN/SUPER_ADMIN as platform admin."""
@@ -180,12 +181,17 @@ class InstructorCourseListView(generics.ListAPIView):
 
     def get_queryset(self, *args, **kwargs):
         user = self.request.user
+        base = (Course.objects
+                .filter(is_deleted=False)
+                .select_related('organization', 'regulatory_authority')
+                .prefetch_related('instructors', 'instructors__user', 'categories')
+                .order_by('-id'))
         if _caller_is_admin(user):
-            return Course.objects.filter(is_deleted=False).order_by('-id')
+            return base
         if hasattr(user, 'instructor'):
-            return Course.objects.filter(instructors=user.instructor, is_deleted=False).order_by('-id')
+            return base.filter(instructors=user.instructor)
         if hasattr(user, 'instructorprofile'):
-            return Course.objects.filter(instructors__user=user, is_deleted=False).order_by('-id')
+            return base.filter(instructors__user=user)
         return Course.objects.none()
 
 class InstructorListView(generics.ListAPIView):
