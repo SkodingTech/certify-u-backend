@@ -13,12 +13,25 @@ if _env_file.exists():
         _k, _, _v = _line.partition('=')
         os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
 
+
+def _env_bool(name, default=False):
+    v = os.environ.get(name)
+    if v is None:
+        return default
+    return v.strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _env_list(name, default=()):
+    raw = os.environ.get(name, '')
+    return [x.strip() for x in raw.split(',') if x.strip()] or list(default)
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-dev-key-change-me')
 
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('1', 'true', 'yes')
+DEBUG = _env_bool('DJANGO_DEBUG', default=False)
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h.strip()]
+ALLOWED_HOSTS = _env_list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 
 INSTALLED_APPS = [
@@ -53,6 +66,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'certifyu.middleware.AuthRateLimitMiddleware',
 ]
 
 ROOT_URLCONF = 'certifyu.urls'
@@ -167,7 +181,106 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-CORS_ORIGIN_ALLOW_ALL = True
+# ─────────────────────────────────────────────────────────────────────────────
+# CORS
+# In production, restrict to known frontends via env var. Falls back to
+# wildcard when DJANGO_CORS_ALLOWED_ORIGINS is unset (preserves dev behaviour).
+# ─────────────────────────────────────────────────────────────────────────────
+INSTALLED_APPS += ['corsheaders'] if 'corsheaders' not in INSTALLED_APPS else []
+_cors_origins = _env_list('DJANGO_CORS_ALLOWED_ORIGINS', default=[])
+if _cors_origins:
+    CORS_ALLOWED_ORIGINS = _cors_origins
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ORIGIN_ALLOW_ALL = False
+else:
+    CORS_ORIGIN_ALLOW_ALL = True  # dev fallback
+
+# CSRF trusted origins — Django 4 requires explicit scheme.
+CSRF_TRUSTED_ORIGINS = _env_list(
+    'DJANGO_CSRF_TRUSTED_ORIGINS',
+    default=['https://cms.certify-u.com', 'https://certify-u.com',
+             'https://www.certify-u.com', 'https://server.certify-u.com'],
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Production-only hardening (gated on DEBUG to keep local dev usable)
+# ─────────────────────────────────────────────────────────────────────────────
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # behind nginx
+    SECURE_SSL_REDIRECT = _env_bool('DJANGO_SECURE_SSL_REDIRECT', default=True)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # 30 days; raise to 1y after burn-in
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = False  # opt in once HSTS_SECONDS is at ≥1y
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = 'same-origin'
+    SECURE_BROWSER_XSS_FILTER = True  # legacy header; harmless to set
+    X_FRAME_OPTIONS = 'DENY'
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Upload size limits (course materials + SCORM packages are larger than default)
+# ─────────────────────────────────────────────────────────────────────────────
+DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024   # 25 MB form payload
+FILE_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024   # 25 MB before spilling to disk
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000             # bumped for multi-row admin pages
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Logging — write tracebacks to a rotating file so prod errors aren't lost.
+# (Replaces "no error visibility" with at least file-based logs until a real
+# observability stack is wired up.)
+# ─────────────────────────────────────────────────────────────────────────────
+_log_dir = os.environ.get('DJANGO_LOG_DIR', '/var/log/certifyu')
+try:
+    Path(_log_dir).mkdir(parents=True, exist_ok=True)
+except (OSError, PermissionError):
+    _log_dir = '/tmp'  # fall back to /tmp if /var/log isn't writable
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '[{asctime}] {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'standard'},
+        'errfile': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(_log_dir, 'errors.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'level': 'WARNING',
+            'formatter': 'standard',
+        },
+    },
+    'loggers': {
+        'django': {'handlers': ['console', 'errfile'], 'level': 'INFO',
+                   'propagate': False},
+        'django.request': {'handlers': ['console', 'errfile'], 'level': 'ERROR',
+                           'propagate': False},
+        'django.security': {'handlers': ['console', 'errfile'], 'level': 'WARNING',
+                            'propagate': False},
+    },
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Default throttling on the OAuth token endpoint (best-effort, in-memory).
+# Backed by Django's local cache so it only protects per-process; for serious
+# brute-force defence put a WAF / Cloudflare rule in front.
+# ─────────────────────────────────────────────────────────────────────────────
+REST_FRAMEWORK_THROTTLE_RATES = {
+    'anon': '60/min',
+    'user': '600/min',
+    'login': '20/min',
+}
+
+# CSP (loose, kept compatible with ckeditor + S3 static — tighten later)
+# Not enforced via middleware here; left as a reminder/follow-up.
 
 
 CKEDITOR_CONFIGS = {
