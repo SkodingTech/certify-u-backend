@@ -283,6 +283,28 @@ REST_FRAMEWORK_THROTTLE_RATES = {
 # Not enforced via middleware here; left as a reminder/follow-up.
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Cache — filesystem-backed so it's shared across gunicorn workers (the
+# default LocMem cache is per-process, which means the rate limiter
+# under-counts with multiple workers).
+# ─────────────────────────────────────────────────────────────────────────────
+_cache_dir = os.environ.get('DJANGO_CACHE_DIR', '/var/cache/certifyu')
+try:
+    Path(_cache_dir).mkdir(parents=True, exist_ok=True)
+except (OSError, PermissionError):
+    _cache_dir = '/tmp/certifyu-cache'
+    Path(_cache_dir).mkdir(parents=True, exist_ok=True)
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': _cache_dir,
+        'TIMEOUT': 300,
+        'OPTIONS': {'MAX_ENTRIES': 10000},
+    },
+}
+
+
 CKEDITOR_CONFIGS = {
     'default': {
         'toolbar': None,
