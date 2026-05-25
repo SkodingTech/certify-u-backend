@@ -656,3 +656,60 @@ class WhatsAppWebhookView(APIView):
             subject=(message[:50] + '…') if len(message) > 50 else message,
         )
         return Response({'status': 'received'}, status=status.HTTP_200_OK)
+
+
+# ── Certificate Templates (per-instructor) ──────────────────────────────────
+# Trainers upload reusable PDF templates and attach them to courses.
+# Initially manual workflow: trainer uploads a PDF; staff/scripts use it to
+# render learner certificates. Per client website-correction PDF (page 16).
+from courses.models import CertificateTemplate
+from courses.serializers import CertificateTemplateSerializer
+
+
+class CertificateTemplateListCreateView(generics.ListCreateAPIView):
+    authentication_classes = (OAuth2Authentication,)
+    permission_classes = (IsAuthenticated,)
+    serializer_class = CertificateTemplateSerializer
+    pagination_class = DefaultPagination
+
+    def get_queryset(self):
+        user = self.request.user
+        # Staff/admin: see all. Otherwise scope to the calling instructor's templates.
+        if user.is_staff or user.is_superuser:
+            return CertificateTemplate.objects.all().order_by('-id')
+        inst = _get_instructor(user)
+        return (CertificateTemplate.objects.filter(instructor=inst).order_by('-id')
+                if inst else CertificateTemplate.objects.none())
+
+    def perform_create(self, serializer):
+        inst = _get_instructor(self.request.user)
+        if not inst:
+            raise permissions.exceptions.PermissionDenied("Only instructors can upload templates.")
+        # If this is marked as default, clear default on any other template for this instructor.
+        if serializer.validated_data.get('is_default'):
+            CertificateTemplate.objects.filter(instructor=inst, is_default=True).update(is_default=False)
+        serializer.save(instructor=inst)
+
+
+class CertificateTemplateDetailView(generics.RetrieveUpdateDestroyAPIView):
+    authentication_classes = (OAuth2Authentication,)
+    permission_classes = (IsAuthenticated,)
+    serializer_class = CertificateTemplateSerializer
+    queryset = CertificateTemplate.objects.all()
+
+    def get_queryset(self):
+        # An instructor can only see/modify their own templates (staff see all).
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return CertificateTemplate.objects.all()
+        inst = _get_instructor(user)
+        return (CertificateTemplate.objects.filter(instructor=inst)
+                if inst else CertificateTemplate.objects.none())
+
+    def perform_update(self, serializer):
+        inst = _get_instructor(self.request.user)
+        if serializer.validated_data.get('is_default') and inst:
+            CertificateTemplate.objects.filter(instructor=inst, is_default=True)\
+                .exclude(pk=self.get_object().pk)\
+                .update(is_default=False)
+        serializer.save()

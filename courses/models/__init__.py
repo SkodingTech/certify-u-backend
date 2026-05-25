@@ -11,7 +11,7 @@ from .presentation import Presentation, PresentationProgress
 from .assessment import Assessment, AssessmentQuestion, AssessmentAttempt
 
 from .regulatory import RegulatoryAuthority, RegulatoryCompliance, RegulatoryReference, ComplianceDocument
-from .certificate import Certificate
+from .certificate import Certificate, CertificateTemplate
 
 from .booking import TrainerAvailability, Slot, Booking
 from .job_role import JobRole
@@ -46,6 +46,7 @@ __all__ = [
     'RegulatoryReference',
     'ComplianceDocument',
     'Certificate',
+    'CertificateTemplate',
     'TrainerAvailability',
     'Slot',
     'Booking',

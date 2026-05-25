@@ -456,3 +456,27 @@ class LiveSessionRequestAdminSerializer(serializers.ModelSerializer):
     def get_student_name(self, obj):
         u = obj.student
         return f"{u.first_name} {u.last_name}".strip() or u.username
+
+
+from courses.models import CertificateTemplate
+
+class CertificateTemplateSerializer(serializers.ModelSerializer):
+    """Per-instructor certificate template (PDF upload + course attachments)."""
+    instructor_name = serializers.SerializerMethodField()
+    courses_count = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = CertificateTemplate
+        fields = ["id", "title", "file", "preview", "status", "status_display",
+                  "is_default", "notes", "courses", "instructor", "instructor_name",
+                  "courses_count", "created_at", "updated_at"]
+        read_only_fields = ["instructor", "created_at", "updated_at"]
+
+    def get_instructor_name(self, obj):
+        u = obj.instructor.user
+        return f"{u.first_name} {u.last_name}".strip() or u.username
+
+    def get_courses_count(self, obj):
+        return obj.courses.count()
+

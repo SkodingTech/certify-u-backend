@@ -92,6 +92,10 @@ urlpatterns = [
     path('certificates/issue/<int:enrollment_id>/', vx.CertificateIssueView.as_view()),
     path('certificates/<str:certificate_id>/download/', vx.CertificateDownloadView.as_view()),
 
+    ### Certificate Templates (per-instructor) ###
+    path('certificate-templates/', vx.CertificateTemplateListCreateView.as_view()),
+    path('certificate-templates/<int:pk>/', vx.CertificateTemplateDetailView.as_view()),
+
     ### Schedule ###
     path('schedule/', vx.ScheduleView.as_view()),
 
