@@ -13,6 +13,13 @@ def validate_image_size(image):
     if file_size > limit_mb * 1024 * 1024:
         raise ValidationError(f"Max size of file is {limit_mb}MB")
 
+
+def validate_document_size(document):
+    file_size = document.size
+    limit_mb = 5
+    if file_size > limit_mb * 1024 * 1024:
+        raise ValidationError(f"Max size of file is {limit_mb}MB")
+
 class UserProfile(GeneralTimeStamp):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='user_profile')
     class Role(models.TextChoices):
@@ -65,9 +72,17 @@ class InstructorProfile(GeneralTimeStamp):
     website = models.URLField(blank=True)
     linkedin = models.URLField(blank=True)
     x_link = models.URLField(blank=True)
+
+    # Trainer onboarding documents (company / compliance docs).
+    vat_certificate = models.FileField(upload_to='instructor_docs/vat/', null=True, blank=True, validators=[validate_document_size])
+    trade_license = models.FileField(upload_to='instructor_docs/trade_license/', null=True, blank=True, validators=[validate_document_size])
+    trainer_eid = models.FileField(upload_to='instructor_docs/eid/', null=True, blank=True, validators=[validate_document_size])
+    resume = models.FileField(upload_to='instructor_docs/resume/', null=True, blank=True, validators=[validate_document_size])
+    qualification = models.FileField(upload_to='instructor_docs/qualification/', null=True, blank=True, validators=[validate_document_size])
+
     verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     def __str__(self):
         return f"Instructor: {self.user.username}"
 
