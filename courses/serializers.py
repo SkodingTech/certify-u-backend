@@ -70,8 +70,12 @@ class LessonSerializer(serializers.ModelSerializer):
         read_only_fields = ['module']
 
     def get_is_completed(self, obj):
-        user = self.context.get('request').user
-        if user.is_authenticated:
+        # Serializer may be used without a request in context (e.g. when
+        # creating/updating a lesson via PostLesson). Guard against it so the
+        # response render doesn't 500 with AttributeError on None.user.
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user and user.is_authenticated:
             return LessonProgress.objects.filter(enrollment__student=user, lesson=obj, completed=True).exists()
         return False
         
