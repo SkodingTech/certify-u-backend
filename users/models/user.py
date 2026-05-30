@@ -1,4 +1,7 @@
+import hashlib
+
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from users.models.base import GeneralTimeStamp
 from django.contrib.auth import get_user_model
@@ -99,3 +102,34 @@ class StudentProfile(GeneralTimeStamp):
     ai_personalization_consent = models.BooleanField(default=False, help_text="Consent for AI/Adaptive learning personalization")
     def __str__(self):
         return f"Student: {self.user.username}"
+
+
+class PasswordResetOTP(GeneralTimeStamp):
+    """One-time code emailed to a user to reset a forgotten password.
+
+    The plaintext OTP is NEVER stored — only a SHA-256 hash. Records are
+    single-use and expire after a short TTL (see settings
+    PASSWORD_RESET_OTP_TTL_MINUTES).
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_otps')
+    email = models.EmailField()
+    otp_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-id']
+        indexes = [
+            models.Index(fields=['email', 'is_used']),
+        ]
+
+    @staticmethod
+    def hash_otp(otp):
+        return hashlib.sha256(str(otp).strip().encode('utf-8')).hexdigest()
+
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    def __str__(self):
+        return f"PasswordResetOTP({self.email}, used={self.is_used})"

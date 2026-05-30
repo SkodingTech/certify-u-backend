@@ -18,3 +18,16 @@ def save_user_profile(sender, instance, **kwargs):
         instance.user_profile.save()
     if hasattr(instance, 'student_profile'):
         instance.student_profile.save()
+
+
+@receiver(post_save, sender=User)
+def notify_admin_on_new_user(sender, instance, created, **kwargs):
+    """Alert platform admins whenever a new user account is created."""
+    if not created:
+        return
+    try:
+        from courses.services import notifications as _notify
+        _notify.notify_admin_new_user(instance)
+    except Exception:
+        # Never let an email failure break account creation.
+        pass

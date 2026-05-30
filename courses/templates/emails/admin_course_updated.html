@@ -1,0 +1,10 @@
+{% extends 'emails/base.html' %}
+{% block preheader %}Course updated: {{ course_title }}{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px 0;">Hi Admin,</p>
+  <h1 style="margin:0 0 12px 0; font-size:20px; color:#1f2430;">Course updated</h1>
+  <p style="margin:0 0 6px 0;">An existing course was just updated.</p>
+  {% include 'emails/_details.html' %}
+  {% include 'emails/_button.html' %}
+{% endblock %}
+{% block footer_note %}You're receiving this admin alert because you manage {{ site_name }}.{% endblock %}

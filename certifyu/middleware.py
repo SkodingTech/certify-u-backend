@@ -10,7 +10,9 @@ from django.core.cache import cache
 from django.http import JsonResponse
 
 
-THROTTLED_PATHS = ('/auth/token', '/auth/convert-token', '/users/CreateUserProfile')
+THROTTLED_PATHS = ('/auth/token', '/auth/convert-token', '/users/CreateUserProfile',
+                   '/users/password-reset/request', '/users/password-reset/verify',
+                   '/users/password-reset/confirm')
 WINDOW_SECONDS  = 60
 MAX_HITS        = 20  # per (IP, path) per window
 

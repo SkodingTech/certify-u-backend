@@ -1,0 +1,11 @@
+{% extends 'emails/base.html' %}
+{% block preheader %}Your course "{{ course_title }}" was created{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px 0;">Hi {{ recipient_name }},</p>
+  <h1 style="margin:0 0 12px 0; font-size:20px; color:#1f2430;">Your course has been created ✏️</h1>
+  <p style="margin:0 0 6px 0;">Your course <strong>{{ course_title }}</strong> was successfully created on {{ site_name }}.</p>
+  {% include 'emails/_details.html' %}
+  <p style="margin:0 0 6px 0;">Add your modules, lessons and a final assessment to get it ready for learners. {% if not is_published %}It will be visible to students once it's reviewed and published.{% endif %}</p>
+  {% include 'emails/_button.html' %}
+{% endblock %}
+{% block footer_note %}You're receiving this because you're an instructor on {{ site_name }}.{% endblock %}

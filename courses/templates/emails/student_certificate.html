@@ -1,0 +1,10 @@
+{% extends 'emails/base.html' %}
+{% block preheader %}Your certificate for {{ course_title }} is ready{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px 0;">Hi {{ recipient_name }},</p>
+  <h1 style="margin:0 0 12px 0; font-size:20px; color:#1f2430;">Congratulations — you did it! 🏆</h1>
+  <p style="margin:0 0 6px 0;">Your certificate for <strong>{{ course_title }}</strong> has been issued. It's a great addition to your CV and LinkedIn profile.</p>
+  {% include 'emails/_details.html' %}
+  {% include 'emails/_button.html' %}
+{% endblock %}
+{% block footer_note %}You're receiving this because you completed a course on {{ site_name }}.{% endblock %}

@@ -1,0 +1,10 @@
+{% extends 'emails/base.html' %}
+{% block preheader %}Booking confirmed — {{ course_title }}{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px 0;">Hi {{ recipient_name }},</p>
+  <h1 style="margin:0 0 12px 0; font-size:20px; color:#1f2430;">Your booking is confirmed 📅</h1>
+  <p style="margin:0 0 6px 0;">Your seat for <strong>{{ course_title }}</strong> is reserved. Here are the details:</p>
+  {% include 'emails/_details.html' %}
+  {% include 'emails/_button.html' %}
+{% endblock %}
+{% block footer_note %}You're receiving this because you booked a session on {{ site_name }}.{% endblock %}

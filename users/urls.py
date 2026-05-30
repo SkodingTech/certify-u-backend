@@ -23,4 +23,9 @@ urlpatterns = [
     path('StudentProfileListView', views.StudentProfileListView.as_view()),
     path('InstructorProfileListView', views.InstructorProfileListView.as_view()),
     path('dashboard-stats/', views.DashboardStatsAPIView.as_view()),
+
+    ### Password reset (email OTP) ###
+    path('password-reset/request', views.PasswordResetRequestView.as_view(), name='password-reset-request'),
+    path('password-reset/verify',  views.PasswordResetVerifyView.as_view(),  name='password-reset-verify'),
+    path('password-reset/confirm', views.PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
 ]

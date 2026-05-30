@@ -1,0 +1,10 @@
+{% extends 'emails/base.html' %}
+{% block preheader %}Security: {{ event }}{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px 0;">Hi Admin,</p>
+  <h1 style="margin:0 0 12px 0; font-size:20px; color:#c0392b;">Security alert</h1>
+  <p style="margin:0 0 6px 0;">A security-relevant event occurred on {{ site_name }}.</p>
+  {% include 'emails/_details.html' %}
+  <p style="margin:14px 0 0 0; color:#6b7280; font-size:13px;">If this looks unexpected, review the account activity and consider tightening access.</p>
+{% endblock %}
+{% block footer_note %}You're receiving this security alert because you manage {{ site_name }}.{% endblock %}

@@ -375,6 +375,63 @@ else:
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     AWS_DEFAULT_ACL = 'public-read'
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Email — Zoho Mail SMTP (delivers the password-reset OTP codes).
+# Set these in the backend .env (NEVER commit secrets):
+#   EMAIL_HOST_USER      -> your Zoho mailbox, e.g. no-reply@certify-u.com
+#   EMAIL_HOST_PASSWORD  -> a Zoho *app-specific* password (Zoho Mail > Settings
+#                           > Security > App Passwords). NOT your login password.
+# Zoho SMTP host by data-region:
+#   smtp.zoho.com (global / .com)   smtp.zoho.eu (EU)   smtp.zoho.in (India)
+#   smtp.zoho.sa (Saudi)            smtp.zohocloud.ca   ...
+# Ports: 465 = SSL (default here)  |  587 = STARTTLS (set EMAIL_USE_TLS=True,
+#        EMAIL_USE_SSL=False).
+# The "From" address MUST be a verified Zoho sender (usually = EMAIL_HOST_USER).
+# When no mailbox is configured AND EMAIL_BACKEND isn't overridden, we fall back
+# to the console backend so OTP codes print to the server log in local dev.
+# ─────────────────────────────────────────────────────────────────────────────
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.zoho.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '465'))
+EMAIL_USE_SSL = _env_bool('EMAIL_USE_SSL', default=True)
+EMAIL_USE_TLS = _env_bool('EMAIL_USE_TLS', default=False)
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '20'))
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL',
+    EMAIL_HOST_USER or 'no-reply@certify-u.com',
+)
+
+if 'EMAIL_BACKEND' in os.environ:
+    EMAIL_BACKEND = os.environ['EMAIL_BACKEND']
+elif EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    # Dev convenience: no Zoho creds -> print emails (incl. OTP) to the console.
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Password-reset OTP tuning.
+PASSWORD_RESET_OTP_TTL_MINUTES = int(os.environ.get('PASSWORD_RESET_OTP_TTL_MINUTES', '10'))
+PASSWORD_RESET_OTP_MAX_ATTEMPTS = int(os.environ.get('PASSWORD_RESET_OTP_MAX_ATTEMPTS', '5'))
+
+# Admin notification recipient(s) — where platform alerts are sent: new users,
+# new/updated courses, new enrolments/payments, and security events. Accepts a
+# comma-separated list. Falls back to DEFAULT_FROM_EMAIL (the platform mailbox)
+# when unset, so notifications still reach the inbox without extra config.
+ADMIN_NOTIFICATION_EMAIL = os.environ.get('ADMIN_NOTIFICATION_EMAIL', DEFAULT_FROM_EMAIL)
+
+# Branding used inside the HTML notification email templates.
+SITE_NAME = os.environ.get('SITE_NAME', 'Certify-U')
+# Public site (frontend) base URL — used for in-email links and the logo.
+FRONTEND_BASE_URL = os.environ.get('FRONTEND_BASE_URL', 'https://certify-u.com').rstrip('/')
+# Absolute URL to the logo shown in email headers (must be publicly reachable).
+EMAIL_LOGO_URL = os.environ.get(
+    'EMAIL_LOGO_URL', FRONTEND_BASE_URL + '/assets/img/logo/logo-1.png'
+)
+# Brand accent colour for buttons / header rule in emails.
+EMAIL_BRAND_COLOR = os.environ.get('EMAIL_BRAND_COLOR', '#F47A20')
+
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 

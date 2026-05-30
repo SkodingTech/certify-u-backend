@@ -1,0 +1,10 @@
+{% extends 'emails/base.html' %}
+{% block preheader %}You're enrolled in {{ course_title }}{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px 0;">Hi {{ recipient_name }},</p>
+  <h1 style="margin:0 0 12px 0; font-size:20px; color:#1f2430;">You're enrolled! 🎉</h1>
+  <p style="margin:0 0 6px 0;">You're now enrolled in <strong>{{ course_title }}</strong>. Everything's ready whenever you are — jump in and start learning at your own pace.</p>
+  {% include 'emails/_button.html' %}
+  <p style="margin:14px 0 0 0; color:#6b7280; font-size:13px;">Tip: complete each module and pass the final assessment to earn your certificate.</p>
+{% endblock %}
+{% block footer_note %}You're receiving this because you enrolled in a course on {{ site_name }}.{% endblock %}

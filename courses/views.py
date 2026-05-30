@@ -1,4 +1,5 @@
 from rest_framework.views import APIView
+from django.db import transaction
 from django.http import HttpResponse
 from rest_framework.permissions import ( IsAuthenticated,)
 from rest_framework.response import Response
@@ -351,8 +352,13 @@ class CreateCourseView(generics.CreateAPIView):
                 # Basic fallback
                 instructor = Instructor.objects.create(user=user, title=user.username)
         
-        course = serializer.save(is_approved=False, status='draft')
-        course.instructors.add(instructor)
+        # Wrap in an explicit transaction so the post_save on_commit hook (which
+        # emails admin + the instructor about the new course) fires only after
+        # the M2M instructor link below is committed — otherwise it would see no
+        # instructors (ATOMIC_REQUESTS is off).
+        with transaction.atomic():
+            course = serializer.save(is_approved=False, status='draft')
+            course.instructors.add(instructor)
         # Assuming organization is required/optional, handled by serializer validation or null
         # If user has an organization, we could add it here too.
 

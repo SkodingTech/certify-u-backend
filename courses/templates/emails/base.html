@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>{{ site_name }}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f1f3f6; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+  <!-- preheader: hidden preview text -->
+  <div style="display:none; max-height:0; overflow:hidden; font-size:1px; line-height:1px; color:#f1f3f6; opacity:0;">
+    {% block preheader %}{{ site_name }} notification{% endblock %}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f3f6;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px; max-width:600px; background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+
+          <!-- header / logo -->
+          <tr>
+            <td align="center" style="padding:32px 24px 16px 24px; background-color:#ffffff;">
+              <a href="{{ frontend_url }}" target="_blank" style="text-decoration:none;">
+                <img src="{{ logo_url }}" alt="{{ site_name }}" width="180" style="display:block; width:180px; max-width:60%; height:auto; border:0;">
+              </a>
+            </td>
+          </tr>
+          <!-- brand accent rule -->
+          <tr>
+            <td style="padding:0 40px;">
+              <div style="height:3px; background-color:{{ brand_color }}; border-radius:3px; line-height:3px; font-size:3px;">&nbsp;</div>
+            </td>
+          </tr>
+
+          <!-- content -->
+          <tr>
+            <td style="padding:28px 40px 8px 40px; font-family:Arial, Helvetica, sans-serif; color:#2b2f38; font-size:15px; line-height:1.6;">
+              {% block content %}{% endblock %}
+            </td>
+          </tr>
+
+          <!-- sign off -->
+          <tr>
+            <td style="padding:8px 40px 32px 40px; font-family:Arial, Helvetica, sans-serif; color:#2b2f38; font-size:15px; line-height:1.6;">
+              <p style="margin:0;">Warm regards,<br><strong>The {{ site_name }} Team</strong></p>
+            </td>
+          </tr>
+
+          <!-- footer -->
+          <tr>
+            <td style="padding:20px 40px; background-color:#fafbfc; border-top:1px solid #eef0f3; font-family:Arial, Helvetica, sans-serif; color:#9aa0aa; font-size:12px; line-height:1.6;">
+              <p style="margin:0 0 6px 0;">&copy; {{ year }} {{ site_name }}. Build your skills.</p>
+              <p style="margin:0;">
+                {% block footer_note %}You're receiving this email because of activity on your {{ site_name }} account.{% endblock %}
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

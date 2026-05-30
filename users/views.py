@@ -13,6 +13,11 @@ from users.functions.user_profile import *
 from users.functions.student_profile import *
 from users.functions.instructor_profile import *
 from users.functions.dashboard_stats import *
+from users.functions.password_reset import (
+    RequestPasswordResetOTP,
+    VerifyPasswordResetOTP,
+    ConfirmPasswordReset,
+)
 
 ### Pagination class ###
 class CompanyPagination(pagination.PageNumberPagination):
@@ -115,3 +120,57 @@ class DashboardStatsAPIView(APIView):
     permission_classes = (IsAuthenticated,)
     def get(self, request):
         return GetDashboardStats(request)
+
+
+### Password reset (email OTP) — public endpoints ###
+def _client_ip(request):
+    fwd = request.META.get('HTTP_X_FORWARDED_FOR')
+    if fwd:
+        return fwd.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
+
+def _notify_admin_security(event, detail, request):
+    """Best-effort admin security alert; never breaks the response."""
+    try:
+        from courses.services import notifications as _notify
+        _notify.notify_admin_security_event(event, detail, ip=_client_ip(request))
+    except Exception:
+        pass
+
+
+class PasswordResetRequestView(APIView):
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+    def post(self, request):
+        resp = RequestPasswordResetOTP(request)
+        if getattr(resp, 'status_code', 500) < 400:
+            _notify_admin_security(
+                'Password reset requested',
+                f"A password-reset OTP was requested for: "
+                f"{request.data.get('email', '(unknown)')}",
+                request,
+            )
+        return resp
+
+
+class PasswordResetVerifyView(APIView):
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+    def post(self, request):
+        return VerifyPasswordResetOTP(request)
+
+
+class PasswordResetConfirmView(APIView):
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+    def post(self, request):
+        resp = ConfirmPasswordReset(request)
+        if getattr(resp, 'status_code', 500) < 400:
+            _notify_admin_security(
+                'Password changed',
+                f"The password was reset/changed for: "
+                f"{request.data.get('email', '(unknown)')}",
+                request,
+            )
+        return resp

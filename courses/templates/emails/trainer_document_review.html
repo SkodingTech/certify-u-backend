@@ -1,0 +1,10 @@
+{% extends 'emails/base.html' %}
+{% block preheader %}Document {{ status_label }}: {{ document_title }}{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px 0;">Hi {{ recipient_name }},</p>
+  <h1 style="margin:0 0 12px 0; font-size:20px; color:#1f2430;">Document review update</h1>
+  <p style="margin:0 0 6px 0;">Your <strong>{{ document_type }}</strong> submission is now marked as <strong>{{ status_label }}</strong>.</p>
+  {% include 'emails/_details.html' %}
+  {% include 'emails/_button.html' %}
+{% endblock %}
+{% block footer_note %}You're receiving this because you're an instructor on {{ site_name }}.{% endblock %}

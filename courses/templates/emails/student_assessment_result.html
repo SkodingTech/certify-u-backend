@@ -1,0 +1,15 @@
+{% extends 'emails/base.html' %}
+{% block preheader %}Assessment result: {{ assessment_title }}{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px 0;">Hi {{ recipient_name }},</p>
+  {% if passed %}
+  <h1 style="margin:0 0 12px 0; font-size:20px; color:#1e8e4e;">You passed! ✅</h1>
+  <p style="margin:0 0 6px 0;">Great work on <strong>{{ assessment_title }}</strong>. You scored <strong>{{ score }}%</strong>.</p>
+  {% else %}
+  <h1 style="margin:0 0 12px 0; font-size:20px; color:#1f2430;">Your assessment result</h1>
+  <p style="margin:0 0 6px 0;">You scored <strong>{{ score }}%</strong> on <strong>{{ assessment_title }}</strong> (passing score: {{ passing_score }}%).</p>
+  <p style="margin:0 0 6px 0;">{{ encouragement }}</p>
+  {% endif %}
+  {% include 'emails/_button.html' %}
+{% endblock %}
+{% block footer_note %}You're receiving this because you took an assessment on {{ site_name }}.{% endblock %}
