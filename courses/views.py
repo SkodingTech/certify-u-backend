@@ -602,8 +602,51 @@ def check_module_completion(user, module):
         enrollment = Enrollment.objects.filter(student=user, course=module.course).first()
         if enrollment:
             mod_progress, _ = ModuleProgress.objects.get_or_create(enrollment=enrollment, module=module)
-            mod_progress.completed = True
-            mod_progress.save()
+            if not mod_progress.completed:
+                mod_progress.completed = True
+                mod_progress.completed_at = timezone.now()
+                mod_progress.save()
+            # Roll the module completion up to the overall enrollment progress/status
+            recompute_enrollment_progress(enrollment)
+
+
+def recompute_enrollment_progress(enrollment):
+    """Recompute Enrollment.progress (0-100) and flip status to 'completed'.
+
+    Progress model: completed modules drive the bulk of progress; when the
+    course has an Assessment, passing it is the final gate (worth the last 10%
+    and required to reach 'completed'). This is what was previously missing —
+    nothing ever wrote Enrollment.progress / status, so completion never
+    propagated and certificate issuance (gated on completion) always failed.
+    """
+    course = enrollment.course
+    total_modules = Module.objects.filter(course=course, is_deleted=False).count()
+    completed_modules = ModuleProgress.objects.filter(
+        enrollment=enrollment, module__course=course, module__is_deleted=False, completed=True
+    ).count()
+    has_assessment = Assessment.objects.filter(course=course).exists()
+    assessment_passed = AssessmentAttempt.objects.filter(
+        student=enrollment.student, assessment__course=course, passed=True
+    ).exists()
+
+    module_fraction = (completed_modules / total_modules) if total_modules > 0 else 1.0
+    content_done = (completed_modules == total_modules) if total_modules > 0 else True
+
+    if has_assessment:
+        progress = module_fraction * 90.0 + (10.0 if assessment_passed else 0.0)
+        fully_complete = content_done and assessment_passed
+    else:
+        progress = module_fraction * 100.0
+        fully_complete = content_done
+
+    enrollment.progress = round(min(progress, 100.0), 2)
+    if fully_complete:
+        enrollment.progress = 100.0
+        if enrollment.status != 'completed':
+            enrollment.status = 'completed'
+            enrollment.completed_at = timezone.now()
+    enrollment.save()
+    return enrollment
 
 class LessonProgressUpdateView(APIView):
     authentication_classes = (OAuth2Authentication,)
@@ -761,6 +804,14 @@ class SubmitAssessmentView(APIView):
         attempt.passed = percentage >= attempt.assessment.passing_score
         attempt.completed_at = timezone.now()
         attempt.save()
+
+        # Roll up into enrollment progress/completion (passing the final
+        # assessment is the completion gate when the course has one).
+        enrollment = Enrollment.objects.filter(
+            student=request.user, course=attempt.assessment.course
+        ).first()
+        if enrollment:
+            recompute_enrollment_progress(enrollment)
 
         # Compute remaining attempts (0 means unlimited per model semantics)
         used_attempts = AssessmentAttempt.objects.filter(

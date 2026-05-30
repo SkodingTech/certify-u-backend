@@ -44,6 +44,18 @@ class CourseSerializer(serializers.ModelSerializer):
         return Lesson.objects.filter(module__course=obj).count()  
 
 class CourseCreateSerializer(serializers.ModelSerializer):
+    # A brand-new trainer has no courses.Instructor record yet; the create
+    # view (CreateCourseView.perform_create) auto-creates one and self-links
+    # it. So instructors must NOT be a required input (and is read-only here to
+    # stop a trainer attaching a course to someone else's instructor id).
+    instructors = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    # Optional on create: slug auto-generates from title in Course.save();
+    # categories can be attached later via the course edit flow.
+    slug = serializers.SlugField(required=False, allow_blank=True)
+    categories = serializers.PrimaryKeyRelatedField(
+        many=True, required=False, queryset=Category.objects.all()
+    )
+
     class Meta:
         model = Course
         fields = '__all__'

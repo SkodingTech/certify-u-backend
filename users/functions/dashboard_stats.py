@@ -19,6 +19,21 @@ def _is_admin(user):
     return bool(prof and getattr(prof, 'role', None) in ('ADMIN', 'SUPER_ADMIN'))
 
 
+def _is_instructor(user):
+    """Unify the platform's three inconsistent instructor signals so a trainer
+    who has onboarded (UserProfile.role / users.InstructorProfile) but not yet
+    created a course (no courses.Instructor record) still gets the instructor
+    dashboard instead of being shown the student view."""
+    if not (user and user.is_authenticated):
+        return False
+    if getattr(user, 'instructor', None) or Instructor.objects.filter(user=user).first():
+        return True
+    if getattr(user, 'instructorprofile', None):
+        return True
+    prof = getattr(user, 'user_profile', None) or getattr(user, 'userprofile', None)
+    return bool(prof and getattr(prof, 'role', None) == 'INSTRUCTOR')
+
+
 def GetDashboardStats(request):
     user = request.user
 
@@ -50,8 +65,9 @@ def GetDashboardStats(request):
 
     # ── Instructor view ──────────────────────────────────────────────────────
     instructor = getattr(user, 'instructor', None) or Instructor.objects.filter(user=user).first()
-    if instructor:
-        instr_courses = Course.objects.filter(instructors=instructor, is_deleted=False)
+    if instructor or _is_instructor(user):
+        instr_courses = (Course.objects.filter(instructors=instructor, is_deleted=False)
+                         if instructor else Course.objects.none())
         total_courses_created = instr_courses.count()
         total_students = Enrollment.objects.filter(course__in=instr_courses).values('student').distinct().count()
         review_count = Review.objects.filter(course__in=instr_courses).count()
